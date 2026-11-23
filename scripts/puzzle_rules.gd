@@ -264,7 +264,9 @@ func generate(level: String, rng: RandomNumberGenerator, max_attempts: int = 800
 		var second := rng.randi_range(0, n - 2)
 		if second >= first:
 			second += 1
-		var caps := {first: capped_sizes[0], second: capped_sizes[1]}
+		var caps: Dictionary = {}
+		caps[first] = capped_sizes[0]
+		caps[second] = capped_sizes[1]
 		var puzzle := _grow_regions(n, queens, caps, rng)
 		if puzzle.is_empty():
 			continue
