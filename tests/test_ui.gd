@@ -5,7 +5,8 @@ var issues := 0
 
 
 func _initialize() -> void:
-	call_deferred("_run")
+	print("Starting headless interface checks")
+	_run()
 
 
 func _check(yes: bool, message: String) -> void:
