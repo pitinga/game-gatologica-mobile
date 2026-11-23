@@ -8,6 +8,7 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     container:
       image: barichello/godot-ci:4.4.1
     steps:
@@ -15,6 +16,6 @@ jobs:
       - name: Import project and parse GDScript
         run: godot --headless --path . --editor --import --quit
       - name: Logic, uniqueness, deductibility and seed validation
-        run: godot --headless --path . --script res://tests/test_puzzles.gd
+        run: timeout 240s godot --headless --path . --script res://tests/test_puzzles.gd
       - name: Interactions and persistence
-        run: godot --headless --path . --script res://tests/test_ui.gd
+        run: timeout 90s godot --headless --path . --script res://tests/test_ui.gd
