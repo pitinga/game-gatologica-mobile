@@ -12,7 +12,7 @@ jobs:
     container:
       image: barichello/godot-ci:4.4.1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Import project and parse GDScript
         run: |
           godot --headless --path . --editor --import --quit 2>&1 | tee /tmp/godot-import.log
