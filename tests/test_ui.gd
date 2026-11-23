@@ -61,7 +61,7 @@ func _run() -> void:
 	if givens.size() == 1:
 		var fixed_index: int = int(givens[0])
 		_check(app.marks[fixed_index] == 1, "Preset cat must be visible from the beginning")
-		var old_undo_size := app.undo_stack.size()
+		var old_undo_size: int = app.undo_stack.size()
 		app._apply_mark(fixed_index, 2)
 		_check(app.marks[fixed_index] == 1, "Preset cat cannot be changed to X")
 		app._apply_mark(fixed_index, 1)
