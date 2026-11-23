@@ -31,7 +31,13 @@ func valid_shape(puzzle: Dictionary) -> bool:
 
 func _regions_connected(n: int, regions: Array) -> bool:
 	for region in range(n):
-		var start := regions.find(region)
+		# JSON.parse_string decodes numeric IDs as floats. Array.find(int)
+		# must not depend on float/int Variant equality.
+		var start := -1
+		for cell in range(n * n):
+			if int(regions[cell]) == region:
+				start = cell
+				break
 		if start == -1:
 			return false
 		var visited: Dictionary = {}

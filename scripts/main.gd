@@ -100,7 +100,7 @@ func _draw() -> void:
 	_button(Rect2(365, 351 - 4, 323, 51), "X  BLOQUEAR", mode == 2, 23)
 	# The board is intentionally below mode buttons; no hidden controls below fold.
 	_draw_board()
-	var count := bank.counts()
+	var count: Dictionary = bank.counts()
 	var remaining := 0
 	for x in marks:
 		if x == 1:

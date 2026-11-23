@@ -29,11 +29,20 @@ func _run() -> void:
 		var boards: Array = raw["puzzles"][level]
 		_check(boards.size() >= 8, "%s needs 5 active and 3 emergency boards" % level)
 		for board in boards:
-			_check(solver.valid_shape(board), "Invalid connected color partition in %s" % level)
+			if not solver.valid_shape(board):
+				_check(false, "Invalid connected color partition in %s" % level)
+				quit(1)
+				return
 			_check(int(board["size"]) == int(RULES.LEVEL_SIZES[level]), "Incorrect board dimensions in %s" % level)
-			_check(solver.count_solutions(board) == 1, "Puzzle has zero or multiple solutions: %s" % level)
+			if solver.count_solutions(board) != 1:
+				_check(false, "Puzzle has zero or multiple solutions: %s" % level)
+				quit(1)
+				return
 			var proof: Dictionary = solver.solve_by_deduction(board)
-			_check(bool(proof.get("solved", false)), "Requires guesses: %s" % level)
+			if not bool(proof.get("solved", false)):
+				_check(false, "Requires guesses: %s" % level)
+				quit(1)
+				return
 			_check(proof.get("forced", []).size() == int(board["size"]), "Proof is incomplete: %s" % level)
 			var marks := PackedInt32Array()
 			marks.resize(int(board["size"]) * int(board["size"]))
