@@ -57,7 +57,7 @@ func _run() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20261123
 	for level in ["easy", "medium", "hard"]:
-		var generated: Dictionary = solver.generate(level, rng, 6000)
+		var generated: Dictionary = solver.generate(level, rng, 3200)
 		_check(not generated.is_empty(), "Runtime generator failed to produce %s" % level)
 		if not generated.is_empty():
 			_check(solver.approved(generated), "Runtime generator admitted an invalid board: %s" % level)
