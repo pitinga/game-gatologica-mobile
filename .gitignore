@@ -1,0 +1,10 @@
+.godot/
+.import/
+*.tmp
+*.log
+.export/
+build/
+*.apk
+*.aab
+*.keystore
+*.jks

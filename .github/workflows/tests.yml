@@ -1,0 +1,20 @@
+name: Godot regression tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.4.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import project and parse GDScript
+        run: godot --headless --path . --editor --import --quit
+      - name: Logic, uniqueness, deductibility and seed validation
+        run: godot --headless --path . --script res://tests/test_puzzles.gd
+      - name: Interactions and persistence
+        run: godot --headless --path . --script res://tests/test_ui.gd
