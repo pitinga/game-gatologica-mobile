@@ -49,9 +49,29 @@ func _run() -> void:
 	app._tap(Vector2(265, 190)) # medium difficulty selection
 	_check(app.selected_level == "medium", "Difficulty toggle did not work")
 	app._tap(Vector2(350, 278)) # NEW GAME
-	_check(int(app.puzzle["size"]) == 7, "New game did not consume a medium puzzle")
+	_check(int(app.puzzle["size"]) == 9, "New game did not consume a 9x9 medium puzzle")
+	app._tap(Vector2(500, 190)) # choose hard
+	app._tap(Vector2(350, 278)) # NEW GAME
+	_check(int(app.puzzle["size"]) == 12, "New game did not consume a 12x12 hard puzzle")
+	# Third easy starter contains a given cat. It must not be removable or blockable.
+	app._start_new_game("easy")
+	app._start_new_game("easy")
+	var givens: Array = app.puzzle.get("givens", [])
+	_check(givens.size() == 1, "Expected one fixed-cat starter in third easy game")
+	if givens.size() == 1:
+		var fixed_index: int = int(givens[0])
+		_check(app.marks[fixed_index] == 1, "Preset cat must be visible from the beginning")
+		var old_undo_size: int = app.undo_stack.size()
+		app._apply_mark(fixed_index, 2)
+		_check(app.marks[fixed_index] == 1, "Preset cat cannot be changed to X")
+		app._apply_mark(fixed_index, 1)
+		_check(app.marks[fixed_index] == 1, "Preset cat cannot be removed")
+		_check(app.undo_stack.size() == old_undo_size, "Locked given cannot create undo entries")
 	app._save_progress()
 	_check(FileAccess.file_exists(app.PROGRESS_PATH), "Progress is not saved")
+	_check(app._load_progress(), "Progress with a fixed cat must restore correctly")
+	if givens.size() == 1:
+		_check(app.marks[int(givens[0])] == 1, "Fixed cat lost during restoration")
 	app.queue_free()
 	await process_frame
 	print("UI: mode, mark, long-press, undo, auto-X, level, save tested; %d failures" % issues)
