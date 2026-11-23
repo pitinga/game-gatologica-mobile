@@ -6,7 +6,8 @@ var issues := 0
 
 
 func _initialize() -> void:
-	call_deferred("_run")
+	print("Starting certified puzzle regression checks")
+	_run()
 
 
 func _check(yes: bool, message: String) -> void:
@@ -24,6 +25,7 @@ func _run() -> void:
 		return
 	var all_signatures: Dictionary = {}
 	for level in ["easy", "medium", "hard"]:
+		print("Checking starter level: ", level)
 		var boards: Array = raw["puzzles"][level]
 		_check(boards.size() >= 8, "%s needs 5 active and 3 emergency boards" % level)
 		for board in boards:
@@ -57,6 +59,7 @@ func _run() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20261123
 	for level in ["easy", "medium", "hard"]:
+		print("Checking procedural generation: ", level)
 		var generated: Dictionary = solver.generate(level, rng, 3200)
 		_check(not generated.is_empty(), "Runtime generator failed to produce %s" % level)
 		if not generated.is_empty():
