@@ -34,7 +34,8 @@ func _regions_connected(n: int, regions: Array) -> bool:
 		var start := regions.find(region)
 		if start == -1:
 			return false
-		var visited := {start: true}
+		var visited: Dictionary = {}
+		visited[start] = true
 		var pending := [start]
 		while not pending.is_empty():
 			var i: int = pending.pop_back()
@@ -87,6 +88,11 @@ func _add_permutations(n: int, cols: PackedInt32Array, used: int, results: Array
 func count_solutions(puzzle: Dictionary, limit: int = 2) -> int:
 	if not valid_shape(puzzle):
 		return 0
+	return _count_solutions_unchecked(puzzle, limit)
+
+
+func _count_solutions_unchecked(puzzle: Dictionary, limit: int = 2) -> int:
+	## Called only on connected boards produced by _grow_regions.
 	var n := int(puzzle["size"])
 	var regions: Array = puzzle["regions"]
 	var count := 0
@@ -262,7 +268,7 @@ func generate(level: String, rng: RandomNumberGenerator, max_attempts: int = 800
 		var puzzle := _grow_regions(n, queens, caps, rng)
 		if puzzle.is_empty():
 			continue
-		if count_solutions(puzzle) != 1:
+		if _count_solutions_unchecked(puzzle) != 1:
 			continue
 		var proof := solve_by_deduction(puzzle)
 		if not bool(proof.get("solved", false)):
