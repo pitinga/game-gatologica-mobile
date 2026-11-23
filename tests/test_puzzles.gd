@@ -25,10 +25,15 @@ func _run() -> void:
 		return
 	var all_signatures: Dictionary = {}
 	for level in ["easy", "medium", "hard"]:
+		var clue_count := 0
 		print("Checking starter level: ", level)
 		var boards: Array = raw["puzzles"][level]
 		_check(boards.size() >= 8, "%s needs 5 active and 3 emergency boards" % level)
 		for board in boards:
+			var given_cells: Array = board.get("givens", [])
+			_check(given_cells.size() <= 1, "At most one preset cat per board")
+			if not given_cells.is_empty():
+				clue_count += 1
 			if not solver.valid_shape(board):
 				_check(false, "Invalid connected color partition in %s" % level)
 				quit(1)
@@ -49,6 +54,12 @@ func _run() -> void:
 			for index in proof.get("forced", []):
 				marks[int(index)] = 1
 			_check(solver.is_win(board, marks), "Deduction proof violates a game rule: %s" % level)
+			if not given_cells.is_empty():
+				var given: int = int(given_cells[0])
+				_check(marks[given] == 1, "Preset cat is absent from the solution")
+				var without_given: PackedInt32Array = marks.duplicate()
+				without_given[given] = 0
+				_check(not solver.is_win(board, without_given), "Win must require a preset cat")
 			var key: String = solver.signature(board)
 			_check(not all_signatures.has(key), "Duplicated startup game")
 			all_signatures[key] = true
@@ -65,6 +76,7 @@ func _run() -> void:
 					_check(excluded[index] == 1, "Solved board has an available empty cell")
 			marks[int(proof["forced"][0])] = 2
 			_check(not solver.is_win(board, marks), "Incorrect marks must not win")
+		_check(clue_count == 2, "%s should contain two seeded fixed-cat puzzles" % level)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20261123
 	for level in ["easy", "medium", "hard"]:
@@ -73,5 +85,7 @@ func _run() -> void:
 		_check(not generated.is_empty(), "Runtime generator failed to produce %s" % level)
 		if not generated.is_empty():
 			_check(solver.approved(generated), "Runtime generator admitted an invalid board: %s" % level)
+			_check(int(generated["size"]) == int(RULES.LEVEL_SIZES[level]), "Generated board size is wrong")
+			_check(generated.get("givens", []).size() <= 1, "Generated too many preset cats")
 	print("Rules: %d starter boards validated; %d failures" % [all_signatures.size(), issues])
 	quit(0 if issues == 0 else 1)

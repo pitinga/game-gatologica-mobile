@@ -3,13 +3,12 @@ extends RefCounted
 ## and cats may not touch, including diagonally. The deduction solver never
 ## receives a hidden solution and never performs a hypothetical/guess branch.
 
-const LEVEL_SIZES := {"easy": 6, "medium": 7, "hard": 8}
-var _permutation_cache: Dictionary = {}
+const LEVEL_SIZES := {"easy": 6, "medium": 9, "hard": 12}
 
 
 func valid_shape(puzzle: Dictionary) -> bool:
 	var n := int(puzzle.get("size", 0))
-	if n < 6 or n > 8:
+	if not LEVEL_SIZES.values().has(n):
 		return false
 	var regions: Array = puzzle.get("regions", [])
 	if regions.size() != n * n:
@@ -26,7 +25,20 @@ func valid_shape(puzzle: Dictionary) -> bool:
 	for amount in amounts:
 		if amount == 0:
 			return false
-	return _regions_connected(n, regions)
+	if not _regions_connected(n, regions):
+		return false
+	var givens: Array = puzzle.get("givens", [])
+	if typeof(givens) != TYPE_ARRAY or givens.size() > 1:
+		return false
+	var used: Dictionary = {}
+	for raw in givens:
+		if typeof(raw) != TYPE_INT and typeof(raw) != TYPE_FLOAT:
+			return false
+		var cell := int(raw)
+		if cell < 0 or cell >= n * n or float(raw) != float(cell) or used.has(cell):
+			return false
+		used[cell] = true
+	return true
 
 
 func _regions_connected(n: int, regions: Array) -> bool:
@@ -69,53 +81,41 @@ func _orthogonal(i: int, n: int) -> Array:
 	return neighbors
 
 
-func _permutations(n: int) -> Array:
-	if not _permutation_cache.has(n):
-		var results: Array = []
-		_add_permutations(n, PackedInt32Array(), 0, results)
-		_permutation_cache[n] = results
-	return _permutation_cache[n]
-
-
-func _add_permutations(n: int, cols: PackedInt32Array, used: int, results: Array) -> void:
-	if cols.size() == n:
-		results.append(cols.duplicate())
-		return
-	for col in range(n):
-		if (used & (1 << col)) != 0:
-			continue
-		if not cols.is_empty() and absi(col - cols[cols.size() - 1]) <= 1:
-			continue
-		cols.append(col)
-		_add_permutations(n, cols, used | (1 << col), results)
-		cols.remove_at(cols.size() - 1)
-
-
 func count_solutions(puzzle: Dictionary, limit: int = 2) -> int:
-	if not valid_shape(puzzle):
+	if not valid_shape(puzzle) or limit < 1:
 		return 0
 	return _count_solutions_unchecked(puzzle, limit)
 
 
 func _count_solutions_unchecked(puzzle: Dictionary, limit: int = 2) -> int:
-	## Called only on connected boards produced by _grow_regions.
+	## Row-by-row bounded DFS avoids materializing the 63+ million non-touching
+	## permutations possible in a 12x12 puzzle. Stop at two solutions.
 	var n := int(puzzle["size"])
-	var regions: Array = puzzle["regions"]
-	var count := 0
-	for columns in _permutations(n):
-		var region_mask := 0
-		var possible := true
-		for row in range(n):
-			var region := int(regions[row * n + columns[row]])
-			if (region_mask & (1 << region)) != 0:
-				possible = false
-				break
-			region_mask |= 1 << region
-		if possible:
-			count += 1
-			if count >= limit:
-				break
-	return count
+	var pinned := PackedInt32Array()
+	pinned.resize(n)
+	pinned.fill(-1)
+	for raw in puzzle.get("givens", []):
+		var cell := int(raw)
+		pinned[int(cell / n)] = cell % n
+	return _count_search(n, puzzle["regions"], pinned, 0, 0, 0, -5, limit)
+
+
+func _count_search(n: int, regions: Array, pinned: PackedInt32Array, row: int, columns: int, colors: int, last_col: int, remaining: int) -> int:
+	if row == n:
+		return 1
+	var found := 0
+	for col in range(n):
+		if pinned[row] != -1 and pinned[row] != col:
+			continue
+		if (columns & (1 << col)) != 0 or (row > 0 and absi(col - last_col) <= 1):
+			continue
+		var region := int(regions[row * n + col])
+		if (colors & (1 << region)) != 0:
+			continue
+		found += _count_search(n, regions, pinned, row + 1, columns | (1 << col), colors | (1 << region), col, remaining - found)
+		if found >= remaining:
+			return found
+	return found
 
 
 func solve_by_deduction(puzzle: Dictionary) -> Dictionary:
@@ -131,6 +131,10 @@ func solve_by_deduction(puzzle: Dictionary) -> Dictionary:
 	candidates.fill(1)
 	var fixed: Dictionary = {}
 	var trace: Array = []
+	for raw in puzzle.get("givens", []):
+		var given := int(raw)
+		fixed[given] = true
+		trace.append(given)
 	var pass_count := 0
 	var support_steps := 0
 	while pass_count < 100:
@@ -221,6 +225,9 @@ func is_win(puzzle: Dictionary, marks: PackedInt32Array) -> bool:
 	var row_used: Dictionary = {}
 	var col_used: Dictionary = {}
 	var region_used: Dictionary = {}
+	for raw in puzzle.get("givens", []):
+		if marks[int(raw)] != 1:
+			return false
 	for i in range(n * n):
 		if marks[i] != 1:
 			continue
@@ -262,30 +269,84 @@ func generate(level: String, rng: RandomNumberGenerator, max_attempts: int = 800
 	if not LEVEL_SIZES.has(level):
 		return {}
 	var n: int = LEVEL_SIZES[level]
-	var choices: Array = _permutations(n)
-	var capped_sizes := [1, 2] if n != 8 else [1, 1]
+	var small_count := 2 if level == "easy" else (6 if level == "medium" else 9)
 	for attempt in range(max_attempts):
-		var queens: PackedInt32Array = choices[rng.randi_range(0, choices.size() - 1)]
-		var first := rng.randi_range(0, n - 1)
-		var second := rng.randi_range(0, n - 2)
-		if second >= first:
-			second += 1
+		var queens := _random_queens(n, rng)
+		if queens.size() != n:
+			continue
+		var order: Array = []
+		for row in range(n):
+			order.append(row)
+		for i in range(n - 1, 0, -1):
+			var j := rng.randi_range(0, i)
+			var value = order[i]
+			order[i] = order[j]
+			order[j] = value
 		var caps: Dictionary = {}
-		caps[first] = capped_sizes[0]
-		caps[second] = capped_sizes[1]
+		for i in range(small_count):
+			caps[int(order[i])] = 1 if rng.randi_range(0, 2) == 0 else 2
 		var puzzle := _grow_regions(n, queens, caps, rng)
 		if puzzle.is_empty():
 			continue
-		if _count_solutions_unchecked(puzzle) != 1:
+		var sizes := PackedInt32Array()
+		sizes.resize(n)
+		for value in puzzle["regions"]:
+			sizes[int(value)] += 1
+		var too_large := false
+		for count in sizes:
+			if count > int(n * n / 2):
+				too_large = true
+				break
+		if too_large:
+			continue
+		# Roughly one quarter of new puzzles begin with a visible fixed cat.
+		var given_cells: Array = []
+		if rng.randi_range(0, 3) == 0:
+			var given_row := rng.randi_range(0, n - 1)
+			given_cells.append(given_row * n + queens[given_row])
+		puzzle["givens"] = given_cells
+		if _count_solutions_unchecked(puzzle, 2) != 1:
 			continue
 		var proof := solve_by_deduction(puzzle)
 		if not bool(proof.get("solved", false)):
 			continue
-		## Difficulty is a starting heuristic, calibrated by subsequent playtests.
-		if level == "hard" and int(proof["passes"]) < 5:
+		if level == "medium" and int(proof["passes"]) < 4:
+			continue
+		if level == "hard" and int(proof["passes"]) < (5 if not given_cells.is_empty() else 6):
 			continue
 		return puzzle
 	return {}
+
+
+func _random_queens(n: int, rng: RandomNumberGenerator) -> PackedInt32Array:
+	var selected := PackedInt32Array()
+	if _fill_random_queens(n, rng, selected, 0):
+		return selected
+	return PackedInt32Array()
+
+
+func _fill_random_queens(n: int, rng: RandomNumberGenerator, selected: PackedInt32Array, used: int) -> bool:
+	if selected.size() == n:
+		return true
+	var available: Array = []
+	for col in range(n):
+		available.append(col)
+	for i in range(n - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var value = available[i]
+		available[i] = available[j]
+		available[j] = value
+	for raw in available:
+		var col := int(raw)
+		if (used & (1 << col)) != 0:
+			continue
+		if not selected.is_empty() and absi(col - selected[selected.size() - 1]) <= 1:
+			continue
+		selected.append(col)
+		if _fill_random_queens(n, rng, selected, used | (1 << col)):
+			return true
+		selected.remove_at(selected.size() - 1)
+	return false
 
 
 func _grow_regions(n: int, queens: PackedInt32Array, caps: Dictionary, rng: RandomNumberGenerator) -> Dictionary:

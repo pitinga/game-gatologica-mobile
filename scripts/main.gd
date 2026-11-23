@@ -4,7 +4,7 @@ extends Node2D
 
 const RULES := preload("res://scripts/puzzle_rules.gd")
 const BANK := preload("res://scripts/puzzle_bank.gd")
-const PROGRESS_PATH := "user://gatologica_progress_v1.json"
+const PROGRESS_PATH := "user://gatologica_progress_v2.json"
 const W := 720.0
 const H := 1280.0
 const BOARD := Rect2(32, 353, 656, 656)
@@ -16,7 +16,7 @@ const WHITE := Color("#ffffff")
 const PURPLE := Color("#7362cb")
 const PINK := Color("#f4b5cc")
 const BORDER := Color("#e2e5ef")
-const PALETTE := ["#f7c6d2", "#fff0b2", "#c9e7fc", "#c9eacb", "#d9cbfa", "#ffd8af", "#c0e5e1", "#f2d0f3"]
+const PALETTE := ["#f7c6d2", "#fff0b2", "#c9e7fc", "#c9eacb", "#d9cbfa", "#ffd8af", "#c0e5e1", "#f2d0f3", "#ebcabb", "#c8d6ea", "#d9e6ad", "#e1c6ab"]
 const DIFFICULTIES := ["easy", "medium", "hard"]
 const DIFFICULTY_NAMES := {"easy": "Fácil", "medium": "Médio", "hard": "Difícil"}
 
@@ -148,6 +148,9 @@ func _draw_board() -> void:
 			var center := pos + Vector2.ONE * (cell_size * 0.5)
 			if marks[i] == 1:
 				_draw_cat(center, cell_size)
+				if _is_given(i):
+					draw_arc(center, cell_size * 0.38, 0, TAU, 36, PURPLE, 3, true)
+					draw_circle(center + Vector2(cell_size * 0.28, -cell_size * 0.28), cell_size * 0.095, PURPLE)
 			elif marks[i] == 2:
 				_draw_x(center, cell_size, Color("#374259"), 5.5)
 			elif auto_x and auto_marks[i] == 1:
@@ -204,7 +207,8 @@ func _draw_help() -> void:
 	_label("Gatos não se tocam, nem na diagonal", Vector2(360, 658), 23, WHITE)
 	_label("Selecione GATO ou X BLOQUEAR.", Vector2(360, 722), 23, WHITE)
 	_label("Segure uma casa para colocar X.", Vector2(360, 760), 23, WHITE)
-	_label("As fases são resolvidas sem adivinhação.", Vector2(360, 804), 20, WHITE)
+	_label("Gato com aro roxo é uma pista fixa.", Vector2(360, 804), 20, WHITE)
+	_label("Sempre resolvível sem adivinhar.", Vector2(360, 825), 18, WHITE)
 	_button(Rect2(100, 845, 520, 60), "ENTENDI", true, 26)
 
 
@@ -306,8 +310,19 @@ func _tap(pos: Vector2) -> void:
 	queue_redraw()
 
 
+func _is_given(index: int) -> bool:
+	for raw in puzzle.get("givens", []):
+		if int(raw) == index:
+			return true
+	return false
+
+
 func _apply_mark(index: int, requested: int) -> void:
 	if puzzle.is_empty() or won or index < 0 or index >= marks.size():
+		return
+	if _is_given(index):
+		notice = "Este gato é uma pista fixa e não pode ser removido."
+		queue_redraw()
 		return
 	undo_stack.append(marks.duplicate())
 	if undo_stack.size() > 100:
@@ -370,13 +385,15 @@ func _start_new_game(level: String) -> void:
 	current_level = level
 	marks.resize(int(puzzle["size"]) * int(puzzle["size"]))
 	marks.fill(0)
+	for raw in puzzle.get("givens", []):
+		marks[int(raw)] = 1
 	undo_stack.clear()
 	elapsed = 0
 	won = false
 	paused = false
 	help_open = false
 	hint_cell = -1
-	notice = "1 gato por linha, coluna e região de cor."
+	notice = "Gato com aro roxo é uma pista fixa." if not puzzle.get("givens", []).is_empty() else "1 gato por linha, coluna e região de cor."
 	bank.set_generation_enabled(_focused)
 	_dirty = true
 	_save_progress()
@@ -389,7 +406,7 @@ func _save_progress() -> void:
 	var saved_marks: Array = []
 	for value in marks:
 		saved_marks.append(value)
-	var data := {"version": 1, "puzzle": puzzle, "marks": saved_marks, "level": current_level, "selected": selected_level, "mode": mode, "auto_x": auto_x, "elapsed": elapsed, "won": won}
+	var data := {"version": 2, "puzzle": puzzle, "marks": saved_marks, "level": current_level, "selected": selected_level, "mode": mode, "auto_x": auto_x, "elapsed": elapsed, "won": won}
 	var temp := PROGRESS_PATH + ".tmp"
 	var file := FileAccess.open(temp, FileAccess.WRITE)
 	if file == null:
@@ -405,7 +422,7 @@ func _load_progress() -> bool:
 	if not FileAccess.file_exists(PROGRESS_PATH):
 		return false
 	var data = JSON.parse_string(FileAccess.get_file_as_string(PROGRESS_PATH))
-	if typeof(data) != TYPE_DICTIONARY or int(data.get("version", 0)) != 1:
+	if typeof(data) != TYPE_DICTIONARY or int(data.get("version", 0)) != 2:
 		return false
 	var board: Dictionary = data.get("puzzle", {})
 	if not rules.approved(board):
@@ -418,6 +435,9 @@ func _load_progress() -> bool:
 		if int(value) < 0 or int(value) > 2:
 			return false
 		restored.append(int(value))
+	for raw in board.get("givens", []):
+		if restored[int(raw)] != 1:
+			return false
 	puzzle = board
 	marks = restored
 	current_level = str(data.get("level", "easy"))

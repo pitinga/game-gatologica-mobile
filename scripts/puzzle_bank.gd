@@ -6,7 +6,7 @@ extends Node
 const RULES := preload("res://scripts/puzzle_rules.gd")
 const LEVELS := ["easy", "medium", "hard"]
 const TARGET := 5
-const SAVE_PATH := "user://gatologica_bank_v1.json"
+const SAVE_PATH := "user://gatologica_bank_v2.json"
 const STARTER_PATH := "res://data/starter_puzzles.json"
 
 var _pool: Dictionary = {"easy": [], "medium": [], "hard": []}
@@ -59,7 +59,7 @@ func _load() -> bool:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return false
 	var raw = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-	if typeof(raw) != TYPE_DICTIONARY or int(raw.get("version", -1)) != 1:
+	if typeof(raw) != TYPE_DICTIONARY or int(raw.get("version", -1)) != 2:
 		return false
 	if typeof(raw.get("pool")) != TYPE_DICTIONARY or typeof(raw.get("emergency")) != TYPE_DICTIONARY:
 		return false
@@ -157,7 +157,7 @@ func _worker_loop() -> void:
 			OS.delay_msec(150)
 			continue
 		## Small generation batches prevent a long uninterruptible operation.
-		var puzzle: Dictionary = generator.generate(wanted, rng, 40)
+		var puzzle: Dictionary = generator.generate(wanted, rng, 12)
 		if not puzzle.is_empty():
 			var sign: String = generator.signature(puzzle)
 			_mutex.lock()
@@ -183,7 +183,7 @@ func _save() -> void:
 	if not _dirty:
 		_mutex.unlock()
 		return
-	var data := {"version": 1, "pool": _pool.duplicate(true), "emergency": _emergency.duplicate(true), "history": _history.duplicate()}
+	var data := {"version": 2, "pool": _pool.duplicate(true), "emergency": _emergency.duplicate(true), "history": _history.duplicate()}
 	_dirty = false
 	_mutex.unlock()
 	var temp := SAVE_PATH + ".tmp"
