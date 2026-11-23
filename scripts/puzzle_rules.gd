@@ -275,37 +275,36 @@ func generate(level: String, rng: RandomNumberGenerator, max_attempts: int = 800
 
 
 func _grow_regions(n: int, queens: PackedInt32Array, caps: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
+	## Grow an incremental random frontier instead of rescanning every empty
+	## cell at each assignment. Bounded to O(board cells * neighbours) per try.
 	var regions := PackedInt32Array()
 	regions.resize(n * n)
 	regions.fill(-1)
 	var sizes := PackedInt32Array()
 	sizes.resize(n)
 	sizes.fill(1)
-	var unfilled: Array = []
+	var frontier: Array = []
 	for row in range(n):
 		regions[row * n + queens[row]] = row
-	for i in range(n * n):
-		if regions[i] < 0:
-			unfilled.append(i)
-	while not unfilled.is_empty():
-		var frontier: Array = []
-		for i in unfilled:
-			var neighbors: Array = []
-			for j in _orthogonal(int(i), n):
-				var region := regions[j]
-				if region >= 0 and sizes[region] < int(caps.get(region, n * n)):
-					neighbors.append(region)
-			if not neighbors.is_empty():
-				frontier.append([i, neighbors])
+	for row in range(n):
+		for neighbor in _orthogonal(row * n + queens[row], n):
+			if regions[neighbor] < 0:
+				frontier.append([neighbor, row])
+	var remaining := n * n - n
+	while remaining > 0:
 		if frontier.is_empty():
 			return {}
-		var choice: Array = frontier[rng.randi_range(0, frontier.size() - 1)]
-		var target := int(choice[0])
-		var options: Array = choice[1]
-		var region := int(options[rng.randi_range(0, options.size() - 1)])
+		var edge: Array = frontier.pop_at(rng.randi_range(0, frontier.size() - 1))
+		var target := int(edge[0])
+		var region := int(edge[1])
+		if regions[target] >= 0 or sizes[region] >= int(caps.get(region, n * n)):
+			continue
 		regions[target] = region
 		sizes[region] += 1
-		unfilled.erase(target)
+		remaining -= 1
+		for neighbor in _orthogonal(target, n):
+			if regions[neighbor] < 0:
+				frontier.append([neighbor, region])
 	var board: Array = []
 	for value in regions:
 		board.append(value)
