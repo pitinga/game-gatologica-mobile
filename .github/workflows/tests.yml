@@ -1,0 +1,26 @@
+name: Godot regression tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    container:
+      image: barichello/godot-ci:4.4.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import project and parse GDScript
+        run: |
+          godot --headless --path . --editor --import --quit 2>&1 | tee /tmp/godot-import.log
+          if grep -E 'SCRIPT ERROR: Parse Error|Failed to load script|ERROR: Parse Error' /tmp/godot-import.log; then
+            echo "GDScript import reported a parse error" >&2
+            exit 1
+          fi
+      - name: Logic, uniqueness, deductibility and seed validation
+        run: timeout 240s godot --headless --path . --script res://tests/test_puzzles.gd
+      - name: Interactions and persistence
+        run: timeout 90s godot --headless --path . --script res://tests/test_ui.gd
